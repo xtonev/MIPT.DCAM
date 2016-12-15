@@ -1,39 +1,22 @@
 #include <TXLib.h>
+#include "Commands.h"
+
+const int VERSION = 1;
 
 enum Warnings
 {
-    LABELS_OVERFLOW = 100,
+    LABELS_OVERFLOW = 300,
 };
 
-const int WRONG_CMD_CODE = -10,
-    PROGRAMM_END_CODE = 2,
-    PUSH_CODE = 31,
-    PUSHREG_CODE = 32,
-    POP_CODE = 41,
-    POPREG_CODE = 42,
-    ADD_CODE = 5,
-    SUB_CODE = 6,
-    MUL_CODE = 7,
-    DIV_CODE = 8,
-    JE_CODE = 10,
-    JNE_CODE = 11,
-    JB_CODE = 12,
-    JG_CODE = 13,
-    AX_REG = 124,
-    BX_REG = 224,
-    CX_REG = 324,
-    DX_REG = 424;
-
-const int LABELSSIZE = 10;
+const int LABELSSIZE = 30;
 
 size_t SizeOfFile (FILE* file);
-char* FirstSpace (char* strPointer);
 int* ReadLabels (char* inBuffer, double* outBuffer, size_t* outBufNum);
 int ReadCmd (char* inBuffer, size_t* inBufNum, double* outBuffer, size_t* outBufNum, int* labels);
 
 int main()
 {
-    FILE* Input = fopen ("Input.txt", "r");
+    FILE* Input = fopen ("SqrEqu.txt", "r");
     size_t fileSize = SizeOfFile (Input);
     char* inBuffer = (char*) calloc (fileSize, sizeof (char) );
     fread (inBuffer, sizeof (char), fileSize, Input);
@@ -47,18 +30,20 @@ int main()
     int* labels = ReadLabels (inBuffer, outBuffer, &outBufNum);
 
     int readingStatus = ReadCmd (inBuffer, &inBufNum, outBuffer, &outBufNum, labels);
-    while (readingStatus != PROGRAMM_END_CODE)
+    while (readingStatus != END_CODE)
     {
+        if (readingStatus == WRONG_CMD_CODE)
+        {
+            free (labels);
+            free (inBuffer);
+            free (outBuffer);
+            assert (!"WRONG_CMD_CODE");
+        }
         readingStatus = ReadCmd (inBuffer, &inBufNum, outBuffer, &outBufNum, labels);
     }
 
-    FILE* Output = fopen ("Output.txt", "bw");
-
-    for (size_t dblCount = 0; dblCount < outBufNum; dblCount++)
-    {
-        fprintf (Output, "%lg ", outBuffer[dblCount] );
-    }
-
+    FILE* Output = fopen ("Output.txt", "wb");
+    fwrite (outBuffer, sizeof (double), outBufNum, Output);
     free (labels);
     free (inBuffer);
     free (outBuffer);
@@ -70,76 +55,47 @@ int main()
 size_t SizeOfFile (FILE* file)
 {
     fseek (file, 0, SEEK_END);
-    size_t fileSize = ftell (file);
+    size_t fileSize = ftell (file) / sizeof (char);
     rewind (file);
     return fileSize;
-}
-
-char* FirstSpace (char* strPointer)
-{
-    char* tab = strchr (strPointer, '\t');
-    char* newLine = strchr (strPointer, '\n');
-    char* space = strchr (strPointer, ' ');
-    if (!tab)
-    {
-        if (!newLine)
-            return space;
-        if (!space)
-            return newLine;
-        else if (space < newLine)
-                return space;
-                else return newLine;
-    }
-    if (!newLine)
-    {
-        if (!tab)
-            return space;
-        if (!space)
-            return tab;
-        else if (space < tab)
-                return space;
-                else return tab;
-    }
-    if (!space)
-    {
-        if (!newLine)
-            return tab;
-        if (!tab)
-            return newLine;
-        else if (tab < newLine)
-                return tab;
-            else return newLine;
-    }
-    if ( (space < newLine) && (space < newLine))
-        return space;
-    if ( (tab < space) && (newLine < tab))
-        return newLine;
-    else return tab;
 }
 
 int* ReadLabels (char* inBuffer, double* outBuffer, size_t* outBufNum)
 {
     int inBufNum = 0;
-    int* labels = (int*) calloc (10, sizeof(int) );
+    int* labels = (int*) calloc (LABELSSIZE, sizeof(int) );
     int labelNum = 0;
 
     while ( (inBuffer[inBufNum] != '.') || (inBuffer[inBufNum - 1] != '\n') )
     {
         while (isspace(inBuffer[inBufNum]))
             inBufNum++;
+
+        if ( inBuffer[inBufNum] == '|' )
+        {
+            inBufNum++;
+            while ( inBuffer[inBufNum] != '|' )
+                inBufNum++;
+            inBufNum++;
+        }
+        while ( isspace(inBuffer[inBufNum]) )
+            inBufNum++;
+
         (*outBufNum)++;
+
         if ( (inBuffer[inBufNum] == ':') && (inBuffer[inBufNum - 1] == '\n') )
         {
             inBuffer[inBufNum] = ' ';
             if ( inBuffer[inBufNum + 1] != EOF )
             {
                 inBufNum++;
-                if ( !isspace(inBuffer[inBufNum + 1]) )
+                labelNum = atoi ( &inBuffer[inBufNum] );
+
+                if (labelNum >= LABELSSIZE)
                 {
                     free (labels);
                     assert (!"WRONG_LABEL");
                 }
-                labelNum = atoi ( &inBuffer[inBufNum] );
                 if ( labels[labelNum] )
                 {
                     free (labels);
@@ -147,76 +103,108 @@ int* ReadLabels (char* inBuffer, double* outBuffer, size_t* outBufNum)
                 }
                 labels[labelNum] = *outBufNum;
                 (*outBufNum)--;
-                inBuffer[inBufNum] = ' ';
-                inBufNum++;
+
+                while ( !isspace(inBuffer[inBufNum]) )
+                {
+                    inBuffer[inBufNum] = ' ';
+                    inBufNum++;
+                }
             }
         }
-        if ( (inBuffer[inBufNum] == '.') && (inBuffer[inBufNum - 1] == '\n') )
-        {
-            outBuffer[0] = *outBufNum - 1;
-            *outBufNum = 1;
-            return labels;
-        }
-        else
+        else if ( (inBuffer[inBufNum] != '.') || (inBuffer[inBufNum - 1] != '\n') )
         {
             while ( !isspace(inBuffer[inBufNum]) )
                 inBufNum++;
         }
+        else (*outBufNum)--;
     }
-    outBuffer[0] = *outBufNum;
-    outBuffer[1] = ' ';
-    *outBufNum = 2;
+
+    outBuffer[0] = (double) VERSION;
+    *outBufNum = 1;
     return labels;
 }
 
 int ReadCmd (char* inBuffer, size_t* inBufNum, double* outBuffer, size_t* outBufNum, int* labels)
 {
-    char command[50] = {0};
+    char command[30] = {0};
     int cmdPtr = 0;
-    int labelNum = 0;
 
     while ( isspace(inBuffer[*inBufNum]) )
+        (*inBufNum)++;
+
+    if ( inBuffer[*inBufNum] == '|' )
     {
+        (*inBufNum)++;
+        while ( inBuffer[*inBufNum] != '|' )
+            (*inBufNum)++;
         (*inBufNum)++;
     }
 
-    while ( !isspace(inBuffer[*inBufNum]) && (inBuffer[*inBufNum] != '.') )
+    while ( isspace(inBuffer[*inBufNum]) )
+        (*inBufNum)++;
+
+    while ( !isspace(inBuffer[*inBufNum]) && (inBuffer[*inBufNum] != EOF) )
     {
         command[cmdPtr] = inBuffer[*inBufNum];
         cmdPtr++;
         (*inBufNum)++;
     }
-    if (inBuffer[*inBufNum] != EOF)
-        (*inBufNum)++;
 
     if ( !strcmp (command, "PUSH") )
     {
         outBuffer [*outBufNum] = PUSH_CODE;
         (*outBufNum)++;
-        outBuffer [*outBufNum] = atof (&inBuffer[*inBufNum]);
-        (*outBufNum)++;
-        *inBufNum = ( FirstSpace(&inBuffer[*inBufNum]) - inBuffer) / sizeof (char) + 1;
-        return 0;
-    }
 
-    if ( !strcmp (command, "PUSHREG") )
-    {
-        outBuffer [*outBufNum] = PUSHREG_CODE;
-        (*outBufNum)++;
-        (*inBufNum)++;
-        if ( (inBuffer[(*inBufNum) + 1] == 'x') && (isspace(inBuffer[(*inBufNum) + 2])) )
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[(*inBufNum) + 1] == 'x') && isspace(inBuffer[(*inBufNum) + 2]) )
         {
             if ( inBuffer[*inBufNum] == 'A' )
-                outBuffer [*outBufNum] = AX_REG;
-            if ( inBuffer[*inBufNum] == 'B' )
-                outBuffer [*outBufNum] = BX_REG;
-            if ( inBuffer[*inBufNum] == 'C' )
-                outBuffer [*outBufNum] = CX_REG;
-            if ( inBuffer[*inBufNum] == 'D' )
-                outBuffer [*outBufNum] = DX_REG;
-            else return WRONG_CMD_CODE;
+                outBuffer[*outBufNum] = AX_REG;
+            else if ( inBuffer[*inBufNum] == 'B' )
+                outBuffer[*outBufNum] = BX_REG;
+            else if ( inBuffer[*inBufNum] == 'C' )
+                outBuffer[*outBufNum] = CX_REG;
+            else if ( inBuffer[*inBufNum] == 'D' )
+                outBuffer[*outBufNum] = DX_REG;
+            else if ( inBuffer[*inBufNum] == 'E' )
+                outBuffer[*outBufNum] = EX_REG;
+            (*outBufNum)++;
+            (*inBufNum) += 2;
         }
-        (*inBufNum) += 2;
+        else if (inBuffer[*inBufNum] == 'S')
+        {
+            outBuffer[*outBufNum] = ST_CODE;
+            (*outBufNum)++;
+            (*inBufNum)++;
+        }
+        else if ( (inBuffer[*inBufNum] == 'R') && (inBuffer[(*inBufNum) + 1] == 'A') && (inBuffer[(*inBufNum) + 2] == 'M') )
+        {
+            outBuffer[*outBufNum] = RAM_CODE;
+            (*inBufNum) += 3;
+            (*outBufNum)++;
+
+            while ( isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            outBuffer[*outBufNum] = atoi (&inBuffer[*inBufNum]);
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+        }
+        else return WRONG_CMD_CODE;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        outBuffer [*outBufNum] = atof (&inBuffer[*inBufNum]);
+        (*outBufNum)++;
+
+        while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
         return 0;
     }
 
@@ -224,27 +212,48 @@ int ReadCmd (char* inBuffer, size_t* inBufNum, double* outBuffer, size_t* outBuf
     {
         outBuffer [*outBufNum] = POP_CODE;
         (*outBufNum)++;
-        return 0;
-    }
 
-    if ( !strcmp (command, "POPREG") )
-    {
-        outBuffer [*outBufNum] = POPREG_CODE;
-        (*outBufNum)++;
-        (*inBufNum)++;
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
         if ( (inBuffer[(*inBufNum) + 1] == 'x') && isspace(inBuffer[(*inBufNum) + 2]) )
         {
             if ( inBuffer[*inBufNum] == 'A' )
-                outBuffer [*outBufNum] = AX_REG;
-            if ( inBuffer[*inBufNum] == 'B' )
-                outBuffer [*outBufNum] = BX_REG;
-            if ( inBuffer[*inBufNum] == 'C' )
-                outBuffer [*outBufNum] = CX_REG;
-            if ( inBuffer[*inBufNum] == 'D' )
-                outBuffer [*outBufNum] = DX_REG;
-            else return WRONG_CMD_CODE;
+                outBuffer[*outBufNum] = AX_REG;
+            else if ( inBuffer[*inBufNum] == 'B' )
+                outBuffer[*outBufNum] = BX_REG;
+            else if ( inBuffer[*inBufNum] == 'C' )
+                outBuffer[*outBufNum] = CX_REG;
+            else if ( inBuffer[*inBufNum] == 'D' )
+                outBuffer[*outBufNum] = DX_REG;
+            else if ( inBuffer[*inBufNum] == 'E' )
+                outBuffer[*outBufNum] = EX_REG;
+            (*outBufNum)++;
+            (*inBufNum) += 2;
         }
-        (*inBufNum) += 2;
+        else if (inBuffer[*inBufNum] == 'S')
+        {
+            outBuffer[*outBufNum] = ST_CODE;
+            (*outBufNum)++;
+            (*inBufNum)++;
+        }
+        else if ( (inBuffer[*inBufNum] == 'R') && (inBuffer[(*inBufNum) + 1] == 'A') && (inBuffer[(*inBufNum) + 2] == 'M') )
+        {
+            outBuffer[*outBufNum] = RAM_CODE;
+            (*inBufNum) += 3;
+            (*outBufNum)++;
+
+            while ( isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            outBuffer[*outBufNum] = atoi (&inBuffer[*inBufNum]);
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+        }
+        else return WRONG_CMD_CODE;
+
         return 0;
     }
 
@@ -276,22 +285,252 @@ int ReadCmd (char* inBuffer, size_t* inBufNum, double* outBuffer, size_t* outBuf
         return 0;
     }
 
+    if ( !strcmp (command, "SQRT") )
+    {
+        outBuffer [*outBufNum] = SQRT_CODE;
+        (*outBufNum)++;
+        return 0;
+    }
+
+    if ( !strcmp (command, "MOV") )
+    {
+        outBuffer [*outBufNum] = MOV_CODE;
+        (*outBufNum)++;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[(*inBufNum) + 1] == 'x') && isspace(inBuffer[(*inBufNum) + 2]) )
+        {
+            if ( inBuffer[*inBufNum] == 'A' )
+                outBuffer[*outBufNum] = AX_REG;
+            else if ( inBuffer[*inBufNum] == 'B' )
+                outBuffer[*outBufNum] = BX_REG;
+            else if ( inBuffer[*inBufNum] == 'C' )
+                outBuffer[*outBufNum] = CX_REG;
+            else if ( inBuffer[*inBufNum] == 'D' )
+                outBuffer[*outBufNum] = DX_REG;
+            else if ( inBuffer[*inBufNum] == 'E' )
+                outBuffer[*outBufNum] = EX_REG;
+            (*outBufNum)++;
+            (*inBufNum) += 2;
+        }
+        else if (inBuffer[*inBufNum] == 'S')
+        {
+            outBuffer[*outBufNum] = ST_CODE;
+            (*outBufNum)++;
+            (*inBufNum)++;
+        }
+        else if ( (inBuffer[*inBufNum] == 'R') && (inBuffer[(*inBufNum) + 1] == 'A') && (inBuffer[(*inBufNum) + 2] == 'M') )
+        {
+            outBuffer[*outBufNum] = RAM_CODE;
+            (*inBufNum) += 3;
+            (*outBufNum)++;
+
+            while ( isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            outBuffer[*outBufNum] = atoi (&inBuffer[*inBufNum]);
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+        }
+        else return WRONG_CMD_CODE;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[(*inBufNum) + 1] == 'x') && isspace(inBuffer[(*inBufNum) + 2]) )
+        {
+            if ( inBuffer[*inBufNum] == 'A' )
+                outBuffer[*outBufNum] = AX_REG;
+            else if ( inBuffer[*inBufNum] == 'B' )
+                outBuffer[*outBufNum] = BX_REG;
+            else if ( inBuffer[*inBufNum] == 'C' )
+                outBuffer[*outBufNum] = CX_REG;
+            else if ( inBuffer[*inBufNum] == 'D' )
+                outBuffer[*outBufNum] = DX_REG;
+            else if ( inBuffer[*inBufNum] == 'E' )
+                outBuffer[*outBufNum] = EX_REG;
+            (*outBufNum)++;
+            (*inBufNum) += 2;
+        }
+        else if (inBuffer[*inBufNum] == 'S')
+        {
+            outBuffer[*outBufNum] = ST_CODE;
+            (*outBufNum)++;
+            (*inBufNum)++;
+        }
+        else if ( (inBuffer[*inBufNum] == 'R') && (inBuffer[(*inBufNum) + 1] == 'A') && (inBuffer[(*inBufNum) + 2] == 'M') )
+        {
+            outBuffer[*outBufNum] = RAM_CODE;
+            (*inBufNum) += 3;
+            (*outBufNum)++;
+
+            while ( isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            outBuffer[*outBufNum] = atoi (&inBuffer[*inBufNum]);
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+        }
+        else return WRONG_CMD_CODE;
+
+        return 0;
+    }
+
+    if ( !strcmp (command, "COPY") )
+    {
+        outBuffer [*outBufNum] = COPY_CODE;
+        (*outBufNum)++;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[(*inBufNum) + 1] == 'x') && isspace(inBuffer[(*inBufNum) + 2]) )
+        {
+            if ( inBuffer[*inBufNum] == 'A' )
+                outBuffer[*outBufNum] = AX_REG;
+            else if ( inBuffer[*inBufNum] == 'B' )
+                outBuffer[*outBufNum] = BX_REG;
+            else if ( inBuffer[*inBufNum] == 'C' )
+                outBuffer[*outBufNum] = CX_REG;
+            else if ( inBuffer[*inBufNum] == 'D' )
+                outBuffer[*outBufNum] = DX_REG;
+            else if ( inBuffer[*inBufNum] == 'E' )
+                outBuffer[*outBufNum] = EX_REG;
+            (*outBufNum)++;
+            (*inBufNum) += 2;
+        }
+        else if (inBuffer[*inBufNum] == 'S')
+        {
+            outBuffer[*outBufNum] = ST_CODE;
+            (*outBufNum)++;
+            (*inBufNum)++;
+        }
+        else if ( (inBuffer[*inBufNum] == 'R') && (inBuffer[(*inBufNum) + 1] == 'A') && (inBuffer[(*inBufNum) + 2] == 'M') )
+        {
+            outBuffer[*outBufNum] = RAM_CODE;
+            (*inBufNum) += 3;
+            (*outBufNum)++;
+
+            while ( isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            outBuffer[*outBufNum] = atoi (&inBuffer[*inBufNum]);
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+        }
+        else return WRONG_CMD_CODE;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[(*inBufNum) + 1] == 'x') && isspace(inBuffer[(*inBufNum) + 2]) )
+        {
+            if ( inBuffer[*inBufNum] == 'A' )
+                outBuffer[*outBufNum] = AX_REG;
+            else if ( inBuffer[*inBufNum] == 'B' )
+                outBuffer[*outBufNum] = BX_REG;
+            else if ( inBuffer[*inBufNum] == 'C' )
+                outBuffer[*outBufNum] = CX_REG;
+            else if ( inBuffer[*inBufNum] == 'D' )
+                outBuffer[*outBufNum] = DX_REG;
+            else if ( inBuffer[*inBufNum] == 'E' )
+                outBuffer[*outBufNum] = EX_REG;
+            (*outBufNum)++;
+            (*inBufNum) += 2;
+        }
+        else if (inBuffer[*inBufNum] == 'S')
+        {
+            outBuffer[*outBufNum] = ST_CODE;
+            (*outBufNum)++;
+            (*inBufNum)++;
+        }
+        else if ( (inBuffer[*inBufNum] == 'R') && (inBuffer[(*inBufNum) + 1] == 'A') && (inBuffer[(*inBufNum) + 2] == 'M') )
+        {
+            outBuffer[*outBufNum] = RAM_CODE;
+            (*inBufNum) += 3;
+            (*outBufNum)++;
+
+            while ( isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            outBuffer[*outBufNum] = atoi (&inBuffer[*inBufNum]);
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+        }
+        else return WRONG_CMD_CODE;
+
+        return 0;
+    }
+
+    if ( !strcmp (command, "DBL") )
+    {
+        outBuffer [*outBufNum] = DBL_CODE;
+        (*outBufNum)++;
+        return 0;
+    }
+
     if ( !strcmp (command, "PROGRAMM_END") )
-        return PROGRAMM_END_CODE;
+    {
+        outBuffer [*outBufNum] = PROGRAMM_END_CODE;
+        (*outBufNum)++;
+        return 0;
+    }
+
+    if ( !strcmp (command, ".") )
+    {
+        (*outBufNum)++;
+        return END_CODE;
+    }
+
+    if ( !strcmp (command, "JUMP") )
+    {
+        outBuffer[*outBufNum] = JUMP_CODE;
+        (*outBufNum)++;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[*inBufNum] == ':') && ( isdigit (inBuffer[(*inBufNum) + 1]) ) )
+        {
+            (*inBufNum)++;
+            outBuffer[*outBufNum] = labels[atoi (&inBuffer[*inBufNum])];
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            return 0;
+        }
+        else return WRONG_CMD_CODE;
+    }
 
     if ( !strcmp (command, "JE") )
     {
         outBuffer[*outBufNum] = JE_CODE;
         (*outBufNum)++;
+
         while ( isspace(inBuffer[*inBufNum]) )
             (*inBufNum)++;
-        if ( (inBuffer[*inBufNum] == ':') && isspace(inBuffer[(*inBufNum) + 2]) )
+
+        if ( (inBuffer[*inBufNum] == ':') && ( isdigit (inBuffer[(*inBufNum) + 1]) ) )
         {
             (*inBufNum)++;
-            labelNum = atoi (&inBuffer[*inBufNum]);
-            outBuffer[*outBufNum] = labels[labelNum];
-            (*inBufNum)++;
+            outBuffer[*outBufNum] = labels[atoi (&inBuffer[*inBufNum])];
             (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
             return 0;
         }
         else return WRONG_CMD_CODE;
@@ -301,37 +540,240 @@ int ReadCmd (char* inBuffer, size_t* inBufNum, double* outBuffer, size_t* outBuf
     {
         outBuffer[*outBufNum] = JNE_CODE;
         (*outBufNum)++;
+
         while ( isspace(inBuffer[*inBufNum]) )
             (*inBufNum)++;
-        labelNum = atoi (&inBuffer[*inBufNum]);
-        outBuffer[*outBufNum] = labels[labelNum];
-        (*inBufNum)++;
-        (*outBufNum)++;
-        return 0;
+
+        if ( (inBuffer[*inBufNum] == ':') && ( isdigit (inBuffer[(*inBufNum) + 1]) ) )
+        {
+            (*inBufNum)++;
+            outBuffer[*outBufNum] = labels[atoi (&inBuffer[*inBufNum])];
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            return 0;
+        }
+        else return WRONG_CMD_CODE;
     }
 
     if ( !strcmp (command, "JB") )
     {
         outBuffer[*outBufNum] = JB_CODE;
         (*outBufNum)++;
+
         while ( isspace(inBuffer[*inBufNum]) )
             (*inBufNum)++;
-        labelNum = atoi (&inBuffer[*inBufNum]);
-        outBuffer[*outBufNum] = labels[labelNum];
-        (*inBufNum)++;
-        (*outBufNum)++;
-        return 0;
+
+        if ( (inBuffer[*inBufNum] == ':') && ( isdigit (inBuffer[(*inBufNum) + 1]) ) )
+        {
+            (*inBufNum)++;
+            outBuffer[*outBufNum] = labels[atoi (&inBuffer[*inBufNum])];
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            return 0;
+        }
+        else return WRONG_CMD_CODE;
     }
 
     if ( !strcmp (command, "JG") )
     {
         outBuffer[*outBufNum] = JG_CODE;
         (*outBufNum)++;
+
         while ( isspace(inBuffer[*inBufNum]) )
             (*inBufNum)++;
-        labelNum = atoi (&inBuffer[*inBufNum]);
-        outBuffer[*outBufNum] = labels[labelNum];
-        (*inBufNum)++;
+
+        if ( (inBuffer[*inBufNum] == ':') && ( isdigit (inBuffer[(*inBufNum) + 1]) ) )
+        {
+            (*inBufNum)++;
+            outBuffer[*outBufNum] = labels[atoi (&inBuffer[*inBufNum])];
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            return 0;
+        }
+        else return WRONG_CMD_CODE;
+    }
+
+    if ( !strcmp (command, "PRINT") )
+    {
+        outBuffer[*outBufNum] = PRINT_CODE;
+        (*outBufNum)++;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[(*inBufNum) + 1] == 'x') && isspace(inBuffer[(*inBufNum) + 2]) )
+        {
+            if ( inBuffer[*inBufNum] == 'A' )
+                outBuffer[*outBufNum] = AX_REG;
+            else if ( inBuffer[*inBufNum] == 'B' )
+                outBuffer[*outBufNum] = BX_REG;
+            else if ( inBuffer[*inBufNum] == 'C' )
+                outBuffer[*outBufNum] = CX_REG;
+            else if ( inBuffer[*inBufNum] == 'D' )
+                outBuffer[*outBufNum] = DX_REG;
+            else if ( inBuffer[*inBufNum] == 'E' )
+                outBuffer[*outBufNum] = EX_REG;
+            (*outBufNum)++;
+            (*inBufNum) += 2;
+        }
+        else if (inBuffer[*inBufNum] == 'S')
+        {
+            outBuffer[*outBufNum] = ST_CODE;
+            (*outBufNum)++;
+            (*inBufNum)++;
+        }
+        else if ( (inBuffer[*inBufNum] == 'R') && (inBuffer[(*inBufNum) + 1] == 'A') && (inBuffer[(*inBufNum) + 2] == 'M') )
+        {
+            outBuffer[*outBufNum] = RAM_CODE;
+            (*inBufNum) += 3;
+            (*outBufNum)++;
+
+            while ( isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            outBuffer[*outBufNum] = atoi (&inBuffer[*inBufNum]);
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+        }
+        else return WRONG_CMD_CODE;
+
+        return 0;
+    }
+
+    if ( !strcmp (command, "SCAN") )
+    {
+        outBuffer[*outBufNum] = SCAN_CODE;
+        (*outBufNum)++;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[(*inBufNum) + 1] == 'x') && isspace(inBuffer[(*inBufNum) + 2]) )
+        {
+            if ( inBuffer[*inBufNum] == 'A' )
+                outBuffer[*outBufNum] = AX_REG;
+            else if ( inBuffer[*inBufNum] == 'B' )
+                outBuffer[*outBufNum] = BX_REG;
+            else if ( inBuffer[*inBufNum] == 'C' )
+                outBuffer[*outBufNum] = CX_REG;
+            else if ( inBuffer[*inBufNum] == 'D' )
+                outBuffer[*outBufNum] = DX_REG;
+            else if ( inBuffer[*inBufNum] == 'E' )
+                outBuffer[*outBufNum] = EX_REG;
+            (*outBufNum)++;
+            (*inBufNum) += 2;
+        }
+        else if (inBuffer[*inBufNum] == 'S')
+        {
+            outBuffer[*outBufNum] = ST_CODE;
+            (*outBufNum)++;
+            (*inBufNum)++;
+        }
+        else if ( (inBuffer[*inBufNum] == 'R') && (inBuffer[(*inBufNum) + 1] == 'A') && (inBuffer[(*inBufNum) + 2] == 'M') )
+        {
+            outBuffer[*outBufNum] = RAM_CODE;
+            (*inBufNum) += 3;
+            (*outBufNum)++;
+
+            while ( isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            outBuffer[*outBufNum] = atoi (&inBuffer[*inBufNum]);
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+        }
+        else return WRONG_CMD_CODE;
+
+        return 0;
+    }
+
+    if ( !strcmp (command, "WRITE") )
+    {
+        outBuffer[*outBufNum] = WRITE_CODE;
+        (*outBufNum)++;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[(*inBufNum) + 1] == 'x') && isspace(inBuffer[(*inBufNum) + 2]) )
+        {
+            if ( inBuffer[*inBufNum] == 'A' )
+                outBuffer[*outBufNum] = AX_REG;
+            else if ( inBuffer[*inBufNum] == 'B' )
+                outBuffer[*outBufNum] = BX_REG;
+            else if ( inBuffer[*inBufNum] == 'C' )
+                outBuffer[*outBufNum] = CX_REG;
+            else if ( inBuffer[*inBufNum] == 'D' )
+                outBuffer[*outBufNum] = DX_REG;
+            else if ( inBuffer[*inBufNum] == 'E' )
+                outBuffer[*outBufNum] = EX_REG;
+            (*outBufNum)++;
+            (*inBufNum) += 2;
+        }
+        else if (inBuffer[*inBufNum] == 'S')
+        {
+            outBuffer[*outBufNum] = ST_CODE;
+            (*outBufNum)++;
+            (*inBufNum)++;
+        }
+        else if ( (inBuffer[*inBufNum] == 'R') && (inBuffer[(*inBufNum) + 1] == 'A') && (inBuffer[(*inBufNum) + 2] == 'M') )
+        {
+            outBuffer[*outBufNum] = RAM_CODE;
+            (*inBufNum) += 3;
+            (*outBufNum)++;
+
+            while ( isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            outBuffer[*outBufNum] = atoi (&inBuffer[*inBufNum]);
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+        }
+        else return WRONG_CMD_CODE;
+
+        return 0;
+    }
+
+    if ( !strcmp (command, "CALL") )
+    {
+        outBuffer[*outBufNum] = CALL_CODE;
+        (*outBufNum)++;
+
+        while ( isspace(inBuffer[*inBufNum]) )
+            (*inBufNum)++;
+
+        if ( (inBuffer[*inBufNum] == ':') && ( isdigit (inBuffer[(*inBufNum) + 1]) ) )
+        {
+            (*inBufNum)++;
+            outBuffer[*outBufNum] = labels[atoi (&inBuffer[*inBufNum])];
+            (*outBufNum)++;
+
+            while ( !isspace(inBuffer[*inBufNum]) )
+                (*inBufNum)++;
+
+            return 0;
+        }
+        else return WRONG_CMD_CODE;
+    }
+
+    if ( !strcmp (command, "BACK") )
+    {
+        outBuffer[*outBufNum] = BACK_CODE;
         (*outBufNum)++;
         return 0;
     }
