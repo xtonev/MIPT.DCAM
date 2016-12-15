@@ -47,7 +47,7 @@ int main()
 size_t SizeOfFile (FILE* file)
 {
     fseek (file, 0, SEEK_END);
-    size_t fileSize = ftell (file);
+    size_t fileSize = ftell (file) / sizeof (char);
     rewind (file);
     return fileSize;
 }
