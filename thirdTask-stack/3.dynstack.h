@@ -2,7 +2,7 @@
 
 enum WARNING
 {
-    STACK_OVERFLOW = 1,
+    STACK_OVERFLOW = 100,
     WRONG_POINTERS,
     OUT_OF_MEMORY,
     JUST_ERROR,
@@ -20,71 +20,75 @@ struct stack
     int checkSum;
 } ;
 
-int checkSum (struct stack *st);
-void stackCtor (struct stack *st, size_t StSize);
-void stackDtor (struct stack **st);
-int stackOK (struct stack *st);
-void stAssert (struct stack *st);
-void dumpStack (struct stack *st);
-void reall (struct stack *st);
-void push (struct stack *st, stType elem);
-stType pop (struct stack *st);
-stType peek (struct stack *st);
-size_t length (struct stack *st);
+int checkSum (struct stack *curSt);
+struct stack* stackCtor (size_t StSize);
+void stackDtor (struct stack **curSt);
+int stackOK (struct stack *curSt);
+void stAssert (struct stack *curSt);
+void dumpStack (struct stack *curSt);
+void reall (struct stack *curSt);
+void push (struct stack *curSt, stType elem);
+stType pop (struct stack *curSt);
+stType peek (struct stack *curSt);
+size_t length (struct stack *curSt);
 
-int checkSum (struct stack *st)
+int checkSum (struct stack *curSt)
 {
     int Sum = 0;
-    for (size_t i = 0; i < st->sizeSt; i++)
+    for (size_t i = 0; i < curSt->sizeSt; i++)
     {
-        Sum ^= st->data[i] + i;
+        Sum ^= curSt->data[i] + i;
     }
-    Sum ^= st->sizeSt;
-    Sum ^= st->maxsize;
-    Sum ^= (int) st->data;
-    Sum ^= (int) &(st->sizeSt);
-    Sum ^= (int) &(st->maxsize);
+    Sum ^= curSt->sizeSt;
+    Sum ^= curSt->maxsize;
+    Sum ^= (int) curSt->data;
+    Sum ^= (int) &(curSt->sizeSt);
+    Sum ^= (int) &(curSt->maxsize);
 
     return Sum;
 }
 
-void stackCtor (struct stack *st, size_t StSize)
+struct stack* stackCtor (size_t StSize)
 {
-    assert(st);
-    st->sizeSt = 0;
-    st->maxsize = StSize;
-    st->data = (stType*) calloc (st->maxsize, sizeof(stType));
-    if (!st->data) assert(!"Calloc can not allocate some memory for me :(");
-    st->checkSum = checkSum(st);
+    struct stack* curSt = (struct stack*) calloc (1, sizeof (struct stack) );
+    curSt->sizeSt = 0;
+    curSt->maxsize = StSize;
+    curSt->data = (stType*) calloc (curSt->maxsize, sizeof (stType) );
+    if (!surSt->data)
+        assert(!"Calloc can not allocate some memory for me :(");
+    curSt->checkSum = checkSum(curSt);
+    return curSt;
 }
 
-void stackDtor (struct stack **st)
+void stackDtor (struct stack **curSt)
 {
-    assert (*st);
-    free ((*st)->data);
-    (*st)->data = NULL;
-    (*st)->maxsize = 0xDEADBEAF;
-    (*st)->sizeSt = 0x0BADF00D;
-    (*st)->checkSum = 0xDEFBADCD;
-    *st = NULL;
+    assert (*curSt);
+    assert (curSt);
+    free ((*curSt)->data);
+    (*curSt)->data = NULL;
+    (*curSt)->maxsize = 0xDEADBEAF;
+    (*curSt)->sizeSt = 0x0BADF00D;
+    (*curSt)->checkSum = 0xDEFBADCD;
+    free (*curSt);
+    *curSt = NULL;
 }
 
-void stAssert (struct stack *st)
+void stAssert (struct stack *curSt)
 {
-    switch (stackOK(st))
+    switch (stackOK(curSt))
     {
         case 0:
             break;
         case STACK_OVERFLOW:
-            dumpStack (st);
+            dumpStack (curSt);
             assert (!"STACK_OVERFLOW");
             break;
         case WRONG_POINTERS:
-            dumpStack (st);
+            dumpStack (curSt);
             assert (!"WRONG_POINTERS");
             break;
         case JUST_ERROR:
-            dumpStack (st);
+            dumpStack (curSt);
             assert (!"JUST_ERROR");
             break;
         default:
@@ -93,80 +97,80 @@ void stAssert (struct stack *st)
     }
 }
 
-int stackOK (struct stack *st)
+int stackOK (struct stack *curSt)
 {
-    if ((!st) && (!st->data))
+    if ((!curSt) && (!curSt->data))
         return WRONG_POINTERS;
-    if (st->sizeSt > st->maxsize)
+    if ( curSt->sizeSt > curSt->maxsize )
         return STACK_OVERFLOW;
-    if ( st->checkSum - checkSum(st) )
+    if ( curSt->checkSum - checkSum(curSt) )
         return JUST_ERROR;
 
     return 0;
 }
 
-void dumpStack (struct stack *st)
+void dumpStack (struct stack *curSt)
 {
     FILE* writeFile = fopen ("dump.txt", "a");
-    fprintf (writeFile, "Stack status: problems? %d\n", StackOK (st) );
+    fprintf (writeFile, "Stack status: problems? %d\n", StackOK (curSt) );
     size_t count = 0;
-    for (; count < st->sizeSt; count++)
-        fprintf (writeFile, "Element number %d: %d, its pointer: %p\n", count, st->data[count], &(st->data[count]));
-    fprintf (writeFile, "Struct pointer: %p\n", st);
-    fprintf (writeFile, "Data pointer: %p\n", st->data);
-    fprintf (writeFile, "Size of stack: %d\n", st->sizeSt);
-    fprintf (writeFile, "Max size of stack: %d\n", st->maxsize);
+    for (; count < curSt->sizeSt; count++)
+        fprintf (writeFile, "Element number %d: %d, its pointer: %p\n", count, curSt->data[count], &(curSt->data[count]));
+    fprintf (writeFile, "Struct pointer: %p\n", curSt);
+    fprintf (writeFile, "Data pointer: %p\n", curSt->data);
+    fprintf (writeFile, "Size of stack: %d\n", curSt->sizeSt);
+    fprintf (writeFile, "Max size of stack: %d\n", curSt->maxsize);
 }
 
-void reall (struct stack *st)
+void reall (struct stack *curSt)
 {
-    stAssert (st);
-    st->maxsize *= MULTIPLIER;
-    (stType*) save = (stType*) realloc (st->data, st->maxsize * sizeof (stType));
+    stAssert (curSt);
+    curSt->maxsize *= MULTIPLIER;
+    (stType*) save = (stType*) realloc (curSt->data, curSt->maxsize * sizeof (stType));
     if (!save)
-        st->data = save;
+        curSt->data = save;
     else assert (!"OUT_OF_MEMORY");
-    stAssert (st);
+    stAssert (curSt);
 }
 
-void push (struct stack *st, stType elem)
+void push (struct stack *curSt, stType elem)
 {
-    stAssert (st);
-    if (st->sizeSt > (st->maxsize * 0.9) )
+    stAssert (curSt);
+    if (curSt->sizeSt > (curSt->maxsize * 0.9) )
     {
-        reall (st);
+        reall (curSt);
     }
-    st->data[st->sizeSt++] = elem;
-    st->checkSum = checkSum(st);
-    stAssert (st);
+    curSt->data[curSt->sizeSt++] = elem;
+    curSt->checkSum = checkSum(curSt);
+    stAssert (curSt);
 }
 
-stType pop (struct stack *st)
+stType pop (struct stack *curSt)
 {
-    stAssert (st);
-    if (st->sizeSt)
+    stAssert (curSt);
+    if (curSt->sizeSt)
     {
-        st->sizeSt--;
-        st->checkSum = checkSum(st);
-        return (st->data[st->sizeSt]);
-    }
-    else assert (!"EMPTY_STACK");
-    return EMPTY_STACK;
-}
-
-stType peek (struct stack *st)
-{
-    stAssert (st);
-    if (st->sizeSt)
-    {
-        return (st->data[st->sizeSt]);
+        curSt->sizeSt--;
+        curSt->checkSum = checkSum(curSt);
+        return (curSt->data[curSt->sizeSt]);
     }
     else assert (!"EMPTY_STACK");
     return EMPTY_STACK;
 }
 
-size_t length (struct stack *st)
+stType peek (struct stack *curSt)
 {
-    stAssert (st);
-    return (st->sizeSt);
+    stAssert (curSt);
+    if (curSt->sizeSt)
+    {
+        return (curSt->data[curSt->sizeSt]);
+    }
+    else assert (!"EMPTY_STACK");
+    return EMPTY_STACK;
+}
+
+size_t length (struct stack *curSt)
+{
+    stAssert (curSt);
+    return (curSt->sizeSt);
 }
