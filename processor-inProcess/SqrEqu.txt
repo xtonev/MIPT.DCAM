@@ -1,0 +1,142 @@
+SCAN Ax SCAN Bx SCAN Cx
+COPY Ax S
+PUSH S 0
+JNE :1 | first coefficient is not null |
+JUMP :2 
+:1
+
+COPY Bx S
+	PUSH S 0
+	JNE :6
+		COPY Cx S
+		JNE :8
+			PUSH S 1
+			PRINT S
+			PUSH S 0
+			PRINT S
+			JUMP :12
+:8
+			COPY Ax S
+			MUL
+			PUSH S 0
+			JB :9
+				PRINT S
+				JUMP :12
+:9
+				PUSH S 2
+				PRINT S
+				PUSH S 0
+				PUSH S 0
+				COPY Cx S 
+				COPY Ax S
+				DIV
+				SUB
+				SQRT
+				DBL
+				PRINT S
+				POP S
+				SUB
+				PRINT S
+				JUMP :12  
+:6
+		COPY Cx S
+		JNE :10
+			PUSH S 2
+			PRINT S
+			POP S POP S 
+			PRINT S
+			POP S
+			COPY Ax S
+			DIV
+			SUB
+			PRINT S
+			JUMP :12
+:10	
+			POP S POP S
+			COPY Bx S
+			MUL
+			PUSH S 4
+			COPY Ax S
+			COPY Cx S
+			MUL
+			MUL
+			SUB
+			COPY S Dx
+			JB :11
+			JE :13
+				PUSH S 0
+				PRINT S
+				JUMP :12
+:13		
+				POP S
+				COPY Bx S
+				PUSH S 2
+				DIV
+				COPY Ax S
+				DIV
+				SUB
+				MOV S Dx
+				PUSH S 1
+				PRINT S
+				PRINT Dx 
+				JUMP :12
+:11
+				SQRT
+				COPY S Dx 
+				SUB
+				COPY Bx S
+				SUB
+				PUSH S 2
+				DIV
+				COPY Ax S
+				DIV
+				MOV S Ex
+				MOV Dx S
+				COPY Bx S
+				SUB
+				PUSH S 2
+				DIV
+				COPY Ax S
+				DIV
+				MOV S Dx
+				PUSH S 2
+				PRINT S
+				PRINT Dx
+				PRINT Ex
+				JUMP :12
+:12
+PROGRAMM_END
+
+:2 
+COPY Bx S
+PUSH S 0
+JNE :3
+	COPY Cx S
+	JNE :4
+		PUSH S 3
+		PRINT S
+		JUMP :12
+:4
+		POP S
+		PRINT S 
+		JUMP :12
+:3 
+	COPY Cx S
+	JNE :5
+		PUSH S 1
+		PRINT S
+		PUSH S 0
+		PRINT S
+		JUMP :12
+:5
+		COPY Bx S
+		DIV
+		SUB
+		PUSH S 1
+		PRINT S
+		POP S
+		PRINT S
+		JUMP :12
+.
+
+
